@@ -1,95 +1,105 @@
-import Image from 'next/image'
-import styles from './page.module.css'
+// @ts-nocheck
+"use client";
+import Image from "next/image";
+import styles from "./page.module.css";
+import { useEffect, useState } from "react";
+import ContentstackAppSDK from "@contentstack/app-sdk";
+import JSONEditorDemo from "./JsonEditor";
+import { isPlainObject } from "lodash";
 
 export default function Home() {
+  const [sideBar, setSideBar] = useState(null);
+  const [fieldUids, setFieldUids] = useState([]);
+  const [json, _setJson] = useState({});
+  const setJson = (json: Object) => {
+    _setJson(json)
+    console.log(json)
+  }
+  useEffect(() => {
+    ContentstackAppSDK.init().then(async function (appSdk) {
+      // Get SidebarWidget object
+      // this is only initialized on the Entry edit page.
+      // on other locations this will return undefined.
+      var sidebarWidget = await appSdk.location.SidebarWidget;
+      setSideBar(sidebarWidget);
+      // fetch app configuration
+      var appConfig = await appSdk.getConfig();
+
+      // fetch entry field information
+      var fieldData = await sidebarWidget!.entry.getData();
+      console.log(fieldData);
+      const fields = Object.keys(sidebarWidget.entry.getData());
+      const removedUids = [
+        "ACL",
+        "_version",
+        "publish_details",
+        "_in_progress",
+        "_embedded_items",
+        "uid",
+        "locale",
+        "created_by",
+        "updated_by",
+        "created_at",
+        "updated_at",
+        "tags",
+      ];
+      const uids = fields.filter((field) => !removedUids.includes(field));
+      console.log(uids);
+      setFieldUids(uids);
+      console.log(uids.map((uid) => sidebarWidget.entry.getField(uid)));
+    });
+  }, []);
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>src/app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+    <div>
+      {fieldUids.map((uid) => {
+        return (
+          <>
+            <div>
+              {uid}
+              <br />
+              <input type="text" id={uid} />
+              <button
+                onClick={() => {
+                  let data = sideBar!.entry
+                    .getField(uid, { useUnsavedSchema: true })
+                    .getData();
+                  if (!isPlainObject(data)) {
+                    data = { data };
+                  }
+                  setJson(data);
+                }}
+              >
+                Get
+              </button>
+              <button
+                onClick={() => {
+                  const data_type = sideBar.entry.getField(uid).data_type;
+                  let data = document.querySelector(`#${uid}`).value;
+                  if (data_type === "json") {
+                    data = JSON.parse(data);
+                  }
+                  sideBar.entry.getField(uid).setData(data);
+                }}
+              >
+                Set
+              </button>
+            </div>
+            <hr />
+          </>
+        );
+      })}
 
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+      <button
+        onClick={(e) => {
+          console.log(sideBar.entry._changedData);
+          setJson(sideBar.entry._changedData);
+        }}
+      >
+        Get unsaved data
+      </button>
 
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore the Next.js 13 playground.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+      <JSONEditorDemo json={json} onChangeJSON={setJson} />
+    </div>
+  );
 }
