@@ -16,6 +16,7 @@ export default function Home() {
     console.log(json)
   }
   useEffect(() => {
+    if(!window) return
     ContentstackAppSDK.init().then(async function (appSdk) {
       // Get SidebarWidget object
       // this is only initialized on the Entry edit page.
